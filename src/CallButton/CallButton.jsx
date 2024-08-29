@@ -2,19 +2,17 @@ import { useState, useEffect } from "react";
 import { createPeer } from "../peerService";
 
 const CallButton = () => {
-  const [callId, setCallId] = useState("");
+  const [callIds, setCallIds] = useState(""); // IDs de los peers a llamar
   const [peerId, setPeerId] = useState(null);
   const [stream, setStream] = useState(null);
+  const [calls, setCalls] = useState([]); // Almacenar múltiples llamadas
   const peer = createPeer();
 
   useEffect(() => {
-    // Obtenemos el ID del peer cuando se abre la conexión
     peer.on("open", (id) => {
-      console.log("Mi ID de Peer es:", id);
       setPeerId(id);
     });
 
-    // Capturamos audio y video
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: true })
       .then((mediaStream) => {
@@ -27,26 +25,31 @@ const CallButton = () => {
       .catch((err) => console.error("Error al obtener media stream:", err));
   }, [peer]);
 
-  const callPeer = (id) => {
-    const call = peer.call(id, stream); // Pasamos el stream de audio/video
-    call.on("stream", (remoteStream) => {
-      const videoElement = document.getElementById("remote-video");
-      if (videoElement) {
-        videoElement.srcObject = remoteStream;
-      }
+  const callPeers = () => {
+    const ids = callIds.split(","); // IDs separados por comas
+    ids.forEach((id) => {
+      const call = peer.call(id.trim(), stream); // Llamamos a cada peer
+      setCalls((prevCalls) => [...prevCalls, call]);
+
+      call.on("stream", (remoteStream) => {
+        const videoElement = document.getElementById(`remote-video-${id}`);
+        if (videoElement) {
+          videoElement.srcObject = remoteStream;
+        }
+      });
     });
   };
 
   return (
     <div>
-      <h3>Tu ID: {peerId}</h3> {/* Mostramos el ID del Peer */}
+      <h3>Tu ID: {peerId}</h3>
       <input
         type="text"
-        placeholder="ID del usuario a llamar"
-        value={callId}
-        onChange={(e) => setCallId(e.target.value)}
+        placeholder="IDs de los usuarios a llamar (separados por comas)"
+        value={callIds}
+        onChange={(e) => setCallIds(e.target.value)}
       />
-      <button onClick={() => callPeer(callId)}>Llamar</button>
+      <button onClick={callPeers}>Llamar</button>
       <div>
         <video
           id="local-video"
@@ -54,7 +57,14 @@ const CallButton = () => {
           muted
           style={{ width: "300px" }}
         ></video>
-        <video id="remote-video" autoPlay style={{ width: "300px" }}></video>
+        {callIds.split(",").map((id) => (
+          <video
+            key={id}
+            id={`remote-video-${id.trim()}`}
+            autoPlay
+            style={{ width: "300px" }}
+          ></video>
+        ))}
       </div>
     </div>
   );
